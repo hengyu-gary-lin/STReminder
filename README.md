@@ -2,4 +2,6 @@
 
 This desktop app is for heavy eye user. You can set a time to remind you to rest and also it can detecte your blik to keep your eye health.
 
-<img width="641" alt="image" src="https://github.com/user-attachments/assets/76677e8d-67ba-4d65-ad6b-e2b9d3e64202">
+
+![image](https://github.com/user-attachments/assets/a8deb874-1eca-44f5-8d5c-0973e8c46529) ![image](https://github.com/user-attachments/assets/c955fec5-1fdc-4d57-9465-2d3477085f18)
+
