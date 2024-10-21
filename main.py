@@ -10,7 +10,7 @@ from scipy.spatial import distance as dist
 from imutils import face_utils
 import threading
 
-# Blink detection constants and functions
+
 EAR_THRESHOLD = 0.40
 BLINK_CONSECUTIVE_FRAMES = 1
 
@@ -34,7 +34,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.messagebox_open = False
         self.tasks = []
 
-        # Blink detection variables
+
         self.blink_detection_running = False
         self.blink_count = 0
         self.blink_start_time = 0
@@ -52,8 +52,8 @@ class ScreenTimeReminder(ttk.Frame):
         self.create_stopwatch_label()
         self.create_reminder_input()
         self.create_buttons()
-        self.create_task_input()
-        self.create_task_tableview()
+        # self.create_task_input()
+        # self.create_task_tableview()
         self.create_blink_detection_button()
 
     def create_stopwatch_label(self):
@@ -89,43 +89,43 @@ class ScreenTimeReminder(ttk.Frame):
         self.reset_button = ttk.Button(button_frame, text="Reset", command=self.reset)
         self.reset_button.pack(side=LEFT, padx=20)
 
-    def create_task_tableview(self):
-        self.task_frame = ttk.Frame(self)
-        self.task_frame.pack(side=BOTTOM, fill=BOTH, expand=YES, padx=10, pady=10)
+    # def create_task_tableview(self):
+    #     self.task_frame = ttk.Frame(self)
+    #     self.task_frame.pack(side=BOTTOM, fill=BOTH, expand=YES, padx=10, pady=10)
 
-        self.scrollbar = ttk.Scrollbar(self.task_frame, orient=tk.VERTICAL)
-        self.scrollbar.pack(side=RIGHT, fill=Y)
+    #     self.scrollbar = ttk.Scrollbar(self.task_frame, orient=tk.VERTICAL)
+    #     self.scrollbar.pack(side=RIGHT, fill=Y)
 
-        self.task_tree = ttk.Treeview(self.task_frame, columns=("Index", "Task", "Status"), show='headings', height=5, yscrollcommand=self.scrollbar.set)
-        self.task_tree.heading("Index", text="Index", anchor=tk.W)
-        self.task_tree.heading("Task", text="Task", anchor=tk.W)
-        self.task_tree.heading("Status", text="Status", anchor=tk.W)
+    #     self.task_tree = ttk.Treeview(self.task_frame, columns=("Index", "Task", "Status"), show='headings', height=5, yscrollcommand=self.scrollbar.set)
+    #     self.task_tree.heading("Index", text="Index", anchor=tk.W)
+    #     self.task_tree.heading("Task", text="Task", anchor=tk.W)
+    #     self.task_tree.heading("Status", text="Status", anchor=tk.W)
         
-        self.task_tree.column("Index", width=60)
-        self.task_tree.column("Task", width=200)
-        self.task_tree.column("Status", width=100)
+    #     self.task_tree.column("Index", width=60)
+    #     self.task_tree.column("Task", width=200)
+    #     self.task_tree.column("Status", width=100)
 
-        self.scrollbar.config(command=self.task_tree.yview)
-        self.task_tree.pack(side=BOTTOM, fill=BOTH, expand=YES)
+    #     self.scrollbar.config(command=self.task_tree.yview)
+    #     self.task_tree.pack(side=BOTTOM, fill=BOTH, expand=YES)
 
-    def create_task_input(self):
-        self.task_input_frame = ttk.Frame(self)
-        self.task_input_frame.pack(side=BOTTOM, pady=10)
+    # def create_task_input(self):
+    #     self.task_input_frame = ttk.Frame(self)
+    #     self.task_input_frame.pack(side=BOTTOM, pady=10)
 
-        self.task_label = ttk.Label(self.task_input_frame, text="Add Task:")
-        self.task_label.pack(side=LEFT, padx=5)
+    #     self.task_label = ttk.Label(self.task_input_frame, text="Add Task:")
+    #     self.task_label.pack(side=LEFT, padx=5)
 
-        self.task_input = ttk.Entry(self.task_input_frame)
-        self.task_input.pack(side=LEFT, padx=5)
+    #     self.task_input = ttk.Entry(self.task_input_frame)
+    #     self.task_input.pack(side=LEFT, padx=5)
 
-        self.add_task_button = ttk.Button(self.task_input_frame, text="Add Task", command=self.add_task, bootstyle="info")
-        self.add_task_button.pack(side=LEFT, padx=5)
+    #     self.add_task_button = ttk.Button(self.task_input_frame, text="Add Task", command=self.add_task, bootstyle="info")
+    #     self.add_task_button.pack(side=LEFT, padx=5)
 
-        self.finish_task_button = ttk.Button(self.task_input_frame, text="Finish Task", command=self.finish_task, bootstyle="success")
-        self.finish_task_button.pack(side=LEFT, padx=5)
+    #     self.finish_task_button = ttk.Button(self.task_input_frame, text="Finish Task", command=self.finish_task, bootstyle="success")
+    #     self.finish_task_button.pack(side=LEFT, padx=5)
 
-        self.delete_task_button = ttk.Button(self.task_input_frame, text="Delete Task", command=self.delete_task, bootstyle="danger")
-        self.delete_task_button.pack(side=LEFT, padx=5)
+    #     self.delete_task_button = ttk.Button(self.task_input_frame, text="Delete Task", command=self.delete_task, bootstyle="danger")
+    #     self.delete_task_button.pack(side=LEFT, padx=5)
 
     def create_blink_detection_button(self):
         blink_frame = ttk.Frame(self)
@@ -137,7 +137,6 @@ class ScreenTimeReminder(ttk.Frame):
         self.blink_info_label = ttk.Label(blink_frame, text="Will remind you to blink if you haven't blinked 15 times in 60 seconds")
         self.blink_info_label.pack(side=TOP, pady=(5, 0))
 
-        # New frame for blink data
         self.blink_data_frame = ttk.LabelFrame(self, text="Blink Data")
         self.blink_data_frame.pack(side=TOP, pady=10, padx=10, fill=X)
 
