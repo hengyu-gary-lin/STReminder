@@ -57,7 +57,6 @@ class ScreenTimeReminder(ttk.Frame):
         # self.create_task_input()
         # self.create_task_tableview()
         self.create_blink_detection_button()
-        # Remove this line: self.create_blink_reset_button()  # Add this line
 
     def create_stopwatch_label(self):
         self.stopwatch_label = ttk.Label(
