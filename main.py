@@ -9,6 +9,8 @@ import numpy as np
 from scipy.spatial import distance as dist
 from imutils import face_utils
 import threading
+import os
+import sys
 
 
 EAR_THRESHOLD = 0.40
@@ -246,8 +248,15 @@ class ScreenTimeReminder(ttk.Frame):
             self.blink_detection_button.config(text="Start Blink Detection")
 
     def run_blink_detection(self):
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        predictor_path = os.path.join(base_path, "shape_predictor_68_face_landmarks.dat")
+
         detector = dlib.get_frontal_face_detector()
-        predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+        predictor = dlib.shape_predictor(predictor_path)
 
         (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
         (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
