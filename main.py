@@ -302,7 +302,7 @@ class ScreenTimeReminder(ttk.Frame):
 
             cv2.putText(frame, f"Blinks: {self.blink_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             cv2.putText(frame, f"Time: {int(elapsed_time)}s", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame, f"Press q to stop", (10, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2   )
+            cv2.putText(frame, f"Press q to stop", (10, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
             cv2.imshow("Eye Blink Detector", frame)
 
@@ -310,17 +310,20 @@ class ScreenTimeReminder(ttk.Frame):
                 self.blink_data['total_blinks'] += self.blink_count
                 self.blink_data['total_minutes'] += 1
                 if self.blink_count < 15:
-                    self.show_topmost_msg("Blink Reminder", "Please blink more frequently!")
+                    self.after(0, self.show_blink_reminder)
                 self.blink_count = 0
                 self.blink_start_time = time.time()
 
             self.blink_data['current_blinks'] = self.blink_count
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or not self.blink_detection_running:
                 break
 
         cap.release()
         cv2.destroyAllWindows()
+        self.blink_detection_running = False
+        self.after(0, lambda: self.blink_detection_button.config(text="Start Blink Detection"))
 
     def update_blink_data(self):
         if self.blink_detection_running:
@@ -328,6 +331,15 @@ class ScreenTimeReminder(ttk.Frame):
             self.avg_blinks_label.config(text=f"Average blinks per minute: {avg_blinks:.2f}")
             self.current_blinks_label.config(text=f"Current blinks: {self.blink_data['current_blinks']}")
             self.after(1000, self.update_blink_data)
+
+    def show_blink_reminder(self):
+        def show_message():
+            messagebox.showinfo("Blink Reminder", "Please blink more frequently!")
+            self.messagebox_open = False
+
+        if not self.messagebox_open:
+            self.messagebox_open = True
+            threading.Thread(target=show_message, daemon=True).start()
 
 if __name__ == "__main__":
     app = ttk.Window(
@@ -337,3 +349,4 @@ if __name__ == "__main__":
     )
     ScreenTimeReminder(app)
     app.mainloop()
+
