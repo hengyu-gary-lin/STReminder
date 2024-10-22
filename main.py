@@ -47,6 +47,8 @@ class ScreenTimeReminder(ttk.Frame):
         self.setup_blink_detection()
         self.update_timer()
 
+        self.last_reminder_time = 0
+
     def create_ui_components(self):
         self.create_stopwatch_label()
         self.create_reminder_input()
@@ -122,15 +124,16 @@ class ScreenTimeReminder(ttk.Frame):
             minutes, seconds = divmod(remainder, 60)
             self.stopwatch_label.config(text=f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}")
 
-            if self.elapsed_time >= self.reminder_interval:
+            if current_time - self.last_reminder_time >= self.reminder_interval:
                 self.show_reminder()
-                self.start_time = current_time  # Reset the timer
+                self.last_reminder_time = current_time
 
         self.after(1000, self.update_timer)
 
     def start(self):
         if not self.running:
             self.start_time = time.time() - self.elapsed_time
+            self.last_reminder_time = self.start_time
             self.running = True
             self.start_button.config(state="disabled")
             self.pause_button.config(state="normal")
@@ -144,6 +147,7 @@ class ScreenTimeReminder(ttk.Frame):
     def reset(self):
         self.running = False
         self.elapsed_time = 0
+        self.last_reminder_time = 0 
         self.stopwatch_label.config(text="00:00:00")
         self.start_button.config(state="normal")
         self.pause_button.config(state="disabled")
