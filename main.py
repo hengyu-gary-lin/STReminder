@@ -57,6 +57,7 @@ class ScreenTimeReminder(ttk.Frame):
         # self.create_task_input()
         # self.create_task_tableview()
         self.create_blink_detection_button()
+        # Remove this line: self.create_blink_reset_button()  # Add this line
 
     def create_stopwatch_label(self):
         self.stopwatch_label = ttk.Label(
@@ -142,11 +143,29 @@ class ScreenTimeReminder(ttk.Frame):
         self.blink_data_frame = ttk.LabelFrame(self, text="Blink Data")
         self.blink_data_frame.pack(side=TOP, pady=10, padx=10, fill=X)
 
-        self.avg_blinks_label = ttk.Label(self.blink_data_frame, text="Average blinks per minute: 0")
-        self.avg_blinks_label.pack(side=TOP, pady=5)
+        data_reset_frame = ttk.Frame(self.blink_data_frame)
+        data_reset_frame.pack(side=TOP, fill=X)
 
-        self.current_blinks_label = ttk.Label(self.blink_data_frame, text="Current blinks: 0")
-        self.current_blinks_label.pack(side=TOP, pady=5)
+        data_frame = ttk.Frame(data_reset_frame)
+        data_frame.pack(side=LEFT, expand=True, fill=X)
+
+        self.avg_blinks_label = ttk.Label(data_frame, text="Average blinks per minute: 0")
+        self.avg_blinks_label.pack(side=TOP, pady=5, anchor=W)
+
+        self.current_blinks_label = ttk.Label(data_frame, text="Current blinks: 0")
+        self.current_blinks_label.pack(side=TOP, pady=5, anchor=W)
+
+        self.create_blink_reset_button(data_reset_frame)
+
+    def create_blink_reset_button(self, parent):
+        self.blink_reset_button = ttk.Button(
+            parent, 
+            text="Reset", 
+            command=self.reset_blink_data, 
+            bootstyle="secondary-outline",
+            width=8
+        )
+        self.blink_reset_button.pack(side=RIGHT, padx=(0, 10), pady=5)
 
     def update_clock(self):
         if self.running:
@@ -274,6 +293,8 @@ class ScreenTimeReminder(ttk.Frame):
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = detector(gray, 0)
 
+            eyes_detected = False
+
             for face in faces:
                 shape = predictor(gray, face)
                 shape = face_utils.shape_to_np(shape)
@@ -291,6 +312,8 @@ class ScreenTimeReminder(ttk.Frame):
                 cv2.drawContours(frame, [left_eye_hull], -1, (0, 255, 0), 1)
                 cv2.drawContours(frame, [right_eye_hull], -1, (0, 255, 0), 1)
 
+                eyes_detected = True
+
                 if ear < EAR_THRESHOLD:
                     frames_counter += 1
                 else:
@@ -300,17 +323,26 @@ class ScreenTimeReminder(ttk.Frame):
 
             elapsed_time = time.time() - self.blink_start_time
 
+            if eyes_detected:
+                status_text = "Eyes detected"
+                status_color = (0, 255, 0)
+            else:
+                status_text = "No eyes detected"
+                status_color = (0, 0, 255)
+
             cv2.putText(frame, f"Blinks: {self.blink_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             cv2.putText(frame, f"Time: {int(elapsed_time)}s", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.putText(frame, status_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
             cv2.putText(frame, f"Press q to stop", (10, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
             cv2.imshow("Eye Blink Detector", frame)
 
             if elapsed_time >= 60:
-                self.blink_data['total_blinks'] += self.blink_count
-                self.blink_data['total_minutes'] += 1
-                if self.blink_count < 15:
-                    self.after(0, self.show_blink_reminder)
+                if eyes_detected:
+                    self.blink_data['total_blinks'] += self.blink_count
+                    self.blink_data['total_minutes'] += 1
+                    if self.blink_count < 15:
+                        self.after(0, self.show_blink_reminder)
                 self.blink_count = 0
                 self.blink_start_time = time.time()
 
@@ -323,23 +355,39 @@ class ScreenTimeReminder(ttk.Frame):
         cap.release()
         cv2.destroyAllWindows()
         self.blink_detection_running = False
-        self.after(0, lambda: self.blink_detection_button.config(text="Start Blink Detection"))
+        self.after(0, self.blink_detection_button.config(text="Start Blink Detection"))
 
     def update_blink_data(self):
         if self.blink_detection_running:
             avg_blinks = self.blink_data['total_blinks'] / max(1, self.blink_data['total_minutes'])
             self.avg_blinks_label.config(text=f"Average blinks per minute: {avg_blinks:.2f}")
             self.current_blinks_label.config(text=f"Current blinks: {self.blink_data['current_blinks']}")
-            self.after(1000, self.update_blink_data)
+        else:
+            self.avg_blinks_label.config(text="Average blinks per minute: 0.00")
+            self.current_blinks_label.config(text="Current blinks: 0")
+        self.after(1000, self.update_blink_data)
 
     def show_blink_reminder(self):
         def show_message():
-            messagebox.showinfo("Blink Reminder", "Please blink more frequently!")
+            tpm_w = tk.Tk()
+            tpm_w.withdraw()
+            tpm_w.attributes('-topmost', True)
+            messagebox.showinfo("Blink Reminder", "Please blink more frequently!", parent=tpm_w)
+            tpm_w.destroy()
             self.messagebox_open = False
 
         if not self.messagebox_open:
             self.messagebox_open = True
             threading.Thread(target=show_message, daemon=True).start()
+
+    def reset_blink_data(self):
+        self.blink_data = {
+            'total_blinks': 0,
+            'total_minutes': 0,
+            'current_blinks': 0
+        }
+        self.blink_count = 0
+        self.update_blink_data()
 
 if __name__ == "__main__":
     app = ttk.Window(
