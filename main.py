@@ -35,6 +35,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.blink_detection_running = False
         self.blink_count = 0
         self.blink_start_time = 0
+        self.frames_counter = 0
 
         self.blink_data = {
             'total_blinks': 0,
@@ -43,10 +44,8 @@ class ScreenTimeReminder(ttk.Frame):
         }
 
         self.create_ui_components()
-        self.update_timer()
-
-        # Initialize blink detection components
         self.setup_blink_detection()
+        self.update_timer()
 
     def create_ui_components(self):
         self.create_stopwatch_label()
@@ -127,9 +126,6 @@ class ScreenTimeReminder(ttk.Frame):
                 self.show_reminder()
                 self.start_time = current_time  # Reset the timer
 
-        if self.blink_detection_running:
-            self.update_blink_data()
-
         self.after(1000, self.update_timer)
 
     def start(self):
@@ -187,45 +183,6 @@ class ScreenTimeReminder(ttk.Frame):
             if self.cap:
                 self.cap.release()
             cv2.destroyAllWindows()
-
-    def update_blink_data(self):
-        avg_blinks = self.blink_data['total_blinks'] / max(1, self.blink_data['total_minutes'])
-        self.avg_blinks_label.config(text=f"Average blinks per minute: {avg_blinks:.2f}")
-        self.current_blinks_label.config(text=f"Current blinks: {self.blink_data['current_blinks']}")
-
-    def reset_blink_data(self):
-        self.blink_data = {
-            'total_blinks': 0,
-            'total_minutes': 0,
-            'current_blinks': 0
-        }
-        self.blink_count = 0
-        self.update_blink_data()
-        messagebox.showinfo("Blink Data Reset", "Blink data has been reset successfully!")
-
-    def show_topmost_msg(self, title, message):
-        tpm_w = tk.Toplevel(self)
-        tpm_w.withdraw()
-        tpm_w.attributes('-topmost', True)
-        messagebox.showinfo(title, message, parent=tpm_w)
-        tpm_w.destroy()
-
-    def setup_blink_detection(self):
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
-        predictor_path = os.path.join(base_path, "shape_predictor_68_face_landmarks.dat")
-
-        self.detector = dlib.get_frontal_face_detector()
-        self.predictor = dlib.shape_predictor(predictor_path)
-
-        (self.lStart, self.lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
-        (self.rStart, self.rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
-
-        self.cap = None
-        self.frames_counter = 0
 
     def process_frame(self):
         if not self.blink_detection_running:
@@ -300,6 +257,45 @@ class ScreenTimeReminder(ttk.Frame):
             self.toggle_blink_detection()
         else:
             self.after(10, self.process_frame)
+
+    def update_blink_data(self):
+        avg_blinks = self.blink_data['total_blinks'] / max(1, self.blink_data['total_minutes'])
+        self.avg_blinks_label.config(text=f"Average blinks per minute: {avg_blinks:.2f}")
+        self.current_blinks_label.config(text=f"Current blinks: {self.blink_data['current_blinks']}")
+
+    def reset_blink_data(self):
+        self.blink_data = {
+            'total_blinks': 0,
+            'total_minutes': 0,
+            'current_blinks': 0
+        }
+        self.blink_count = 0
+        self.update_blink_data()
+        messagebox.showinfo("Blink Data Reset", "Blink data has been reset successfully!")
+
+    def show_topmost_msg(self, title, message):
+        tpm_w = tk.Toplevel(self)
+        tpm_w.withdraw()
+        tpm_w.attributes('-topmost', True)
+        messagebox.showinfo(title, message, parent=tpm_w)
+        tpm_w.destroy()
+
+    def setup_blink_detection(self):
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        predictor_path = os.path.join(base_path, "shape_predictor_68_face_landmarks.dat")
+
+        self.detector = dlib.get_frontal_face_detector()
+        self.predictor = dlib.shape_predictor(predictor_path)
+
+        (self.lStart, self.lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
+        (self.rStart, self.rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
+
+        self.cap = None
+        self.frames_counter = 0
 
     def show_blink_reminder(self):
         if not self.messagebox_open:
