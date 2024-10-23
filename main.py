@@ -10,6 +10,9 @@ from scipy.spatial import distance as dist
 from imutils import face_utils
 import os
 import sys
+import queue
+from PIL import Image, ImageTk
+import threading
 
 EAR_THRESHOLD = 0.40
 BLINK_CONSECUTIVE_FRAMES = 1
@@ -43,6 +46,11 @@ class ScreenTimeReminder(ttk.Frame):
             'current_blinks': 0
         }
 
+        self.frame_queue = queue.Queue(maxsize=10)
+        self.blink_data_queue = queue.Queue()
+
+        self.video_frame = None
+
         self.create_ui_components()
         self.setup_blink_detection()
         self.update_timer()
@@ -50,14 +58,20 @@ class ScreenTimeReminder(ttk.Frame):
         self.last_reminder_time = 0
 
     def create_ui_components(self):
+        self.create_main_content_frame()
         self.create_stopwatch_label()
         self.create_reminder_input()
         self.create_buttons()
         self.create_blink_detection_button()
+        self.create_video_frame()
+
+    def create_main_content_frame(self):
+        self.main_content_frame = ttk.Frame(self)
+        self.main_content_frame.pack(side=LEFT, fill=BOTH, expand=YES, padx=10, pady=10)
 
     def create_stopwatch_label(self):
         self.stopwatch_label = ttk.Label(
-            master=self,
+            master=self.main_content_frame,
             font="-size 32",
             anchor=CENTER,
             text="00:00:00"
@@ -65,18 +79,18 @@ class ScreenTimeReminder(ttk.Frame):
         self.stopwatch_label.pack(side=TOP, fill=X, padx=60, pady=20)
 
     def create_reminder_input(self):
-        self.reminder_label = ttk.Label(self, text="Set screen time reminder (min):")
+        self.reminder_label = ttk.Label(self.main_content_frame, text="Set screen time reminder (min):")
         self.reminder_label.pack(side=TOP, pady=5)  
         
-        self.reminder_input = ttk.Entry(self)
+        self.reminder_input = ttk.Entry(self.main_content_frame)
         self.reminder_input.pack(side=TOP, pady=10)
         self.reminder_input.insert(0, "5")
 
-        self.set_reminder_button = ttk.Button(self, text="Set Reminder Time", command=self.set_reminder_time)
+        self.set_reminder_button = ttk.Button(self.main_content_frame, text="Set Reminder Time", command=self.set_reminder_time)
         self.set_reminder_button.pack(side=TOP, pady=10)
 
     def create_buttons(self):
-        button_frame = ttk.Frame(self)
+        button_frame = ttk.Frame(self.main_content_frame)
         button_frame.pack(side=TOP, pady=10)
 
         self.start_button = ttk.Button(button_frame, text="Start", command=self.start, bootstyle="info")
@@ -89,7 +103,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.reset_button.pack(side=LEFT, padx=20)
 
     def create_blink_detection_button(self):
-        blink_frame = ttk.Frame(self)
+        blink_frame = ttk.Frame(self.main_content_frame)
         blink_frame.pack(side=TOP, pady=10)
 
         self.blink_detection_button = ttk.Button(blink_frame, text="Start Blink Detection", command=self.toggle_blink_detection, bootstyle="warning")
@@ -98,7 +112,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.blink_info_label = ttk.Label(blink_frame, text="Will remind you to blink if you haven't blinked 15 times in 60 seconds")
         self.blink_info_label.pack(side=TOP, pady=(5, 0))
 
-        self.blink_data_frame = ttk.LabelFrame(self, text="Blink Data")
+        self.blink_data_frame = ttk.LabelFrame(self.main_content_frame, text="Blink Data")
         self.blink_data_frame.pack(side=TOP, pady=10, padx=10, fill=X)
 
         self.avg_blinks_label = ttk.Label(self.blink_data_frame, text="Average blinks per minute: 0")
@@ -115,6 +129,10 @@ class ScreenTimeReminder(ttk.Frame):
             width=8
         )
         self.blink_reset_button.pack(side=TOP, padx=(0, 10), pady=5)
+
+    def create_video_frame(self):
+        self.video_frame = ttk.Label(self)
+        self.video_frame.pack(side=RIGHT, pady=10, padx=10)
 
     def update_timer(self):
         if self.running:
@@ -180,87 +198,105 @@ class ScreenTimeReminder(ttk.Frame):
             self.blink_count = 0
             self.blink_start_time = time.time()
             self.cap = cv2.VideoCapture(0)
-            self.after(10, self.process_frame)
+            self.blink_thread = threading.Thread(target=self.blink_detection_loop, daemon=True)
+            self.blink_thread.start()
+            self.after(10, self.update_frame)
         else:
             self.blink_detection_running = False
             self.blink_detection_button.config(text="Start Blink Detection")
             if self.cap:
                 self.cap.release()
-            cv2.destroyAllWindows()
+            self.video_frame.config(image='')
 
-    def process_frame(self):
+    def blink_detection_loop(self):
+        while self.blink_detection_running:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = self.detector(gray, 0)
+
+            eyes_detected = False
+            for face in faces:
+                shape = self.predictor(gray, face)
+                shape = face_utils.shape_to_np(shape)
+
+                left_eye = shape[self.lStart:self.lEnd]
+                right_eye = shape[self.rStart:self.rEnd]
+
+                left_ear = calculate_ear(left_eye)
+                right_ear = calculate_ear(right_eye)
+
+                ear = (left_ear + right_ear) / 2.0
+
+                left_eye_hull = cv2.convexHull(left_eye)
+                right_eye_hull = cv2.convexHull(right_eye)
+                cv2.drawContours(frame, [left_eye_hull], -1, (0, 255, 0), 1)
+                cv2.drawContours(frame, [right_eye_hull], -1, (0, 255, 0), 1)
+
+                eyes_detected = True
+
+                if ear < EAR_THRESHOLD:
+                    self.frames_counter += 1
+                else:
+                    if self.frames_counter >= BLINK_CONSECUTIVE_FRAMES:
+                        self.blink_count += 1
+                    self.frames_counter = 0
+
+            elapsed_time = time.time() - self.blink_start_time
+
+            if eyes_detected:
+                status_text = "Eyes detected"
+                status_color = (0, 255, 0)
+            else:
+                status_text = "No eyes detected"
+                status_color = (0, 0, 255)
+
+            cv2.putText(frame, f"Blinks: {self.blink_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.putText(frame, f"Time: {int(elapsed_time)}s", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.putText(frame, status_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+
+            if not self.frame_queue.full():
+                self.frame_queue.put(frame)
+
+            if elapsed_time >= 60:
+                if eyes_detected:
+                    self.blink_data_queue.put({
+                        'total_blinks': self.blink_count,
+                        'current_blinks': self.blink_count
+                    })
+                    if self.blink_count < 15:
+                        self.after(0, self.show_blink_reminder)
+                self.blink_count = 0
+                self.blink_start_time = time.time()
+
+            time.sleep(0.01)  # Small delay to prevent excessive CPU usage
+
+    def update_frame(self):
         if not self.blink_detection_running:
             return
 
-        ret, frame = self.cap.read()
-        if not ret:
-            self.toggle_blink_detection()
-            return
+        try:
+            frame = self.frame_queue.get_nowait()
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = Image.fromarray(frame_rgb)
+            photo = ImageTk.PhotoImage(image=image)
+            self.video_frame.config(image=photo)
+            self.video_frame.image = photo
+        except queue.Empty:
+            pass
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self.detector(gray, 0)
+        try:
+            blink_data = self.blink_data_queue.get_nowait()
+            self.blink_data['total_blinks'] += blink_data['total_blinks']
+            self.blink_data['total_minutes'] += 1
+            self.blink_data['current_blinks'] = blink_data['current_blinks']
+            self.update_blink_data()
+        except queue.Empty:
+            pass
 
-        eyes_detected = False
-
-        for face in faces:
-            shape = self.predictor(gray, face)
-            shape = face_utils.shape_to_np(shape)
-
-            left_eye = shape[self.lStart:self.lEnd]
-            right_eye = shape[self.rStart:self.rEnd]
-
-            left_ear = calculate_ear(left_eye)
-            right_ear = calculate_ear(right_eye)
-
-            ear = (left_ear + right_ear) / 2.0
-
-            left_eye_hull = cv2.convexHull(left_eye)
-            right_eye_hull = cv2.convexHull(right_eye)
-            cv2.drawContours(frame, [left_eye_hull], -1, (0, 255, 0), 1)
-            cv2.drawContours(frame, [right_eye_hull], -1, (0, 255, 0), 1)
-
-            eyes_detected = True
-
-            if ear < EAR_THRESHOLD:
-                self.frames_counter += 1
-            else:
-                if self.frames_counter >= BLINK_CONSECUTIVE_FRAMES:
-                    self.blink_count += 1
-                self.frames_counter = 0
-
-        elapsed_time = time.time() - self.blink_start_time
-
-        if eyes_detected:
-            status_text = "Eyes detected"
-            status_color = (0, 255, 0)
-        else:
-            status_text = "No eyes detected"
-            status_color = (0, 0, 255)
-
-        cv2.putText(frame, f"Blinks: {self.blink_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.putText(frame, f"Time: {int(elapsed_time)}s", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.putText(frame, status_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
-        cv2.putText(frame, f"Press q to stop", (10, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-        cv2.imshow("Eye Blink Detector", frame)
-
-        if elapsed_time >= 60:
-            if eyes_detected:
-                self.blink_data['total_blinks'] += self.blink_count
-                self.blink_data['total_minutes'] += 1
-                if self.blink_count < 15:
-                    self.show_blink_reminder()
-            self.blink_count = 0
-            self.blink_start_time = time.time()
-
-        self.blink_data['current_blinks'] = self.blink_count
-        self.update_blink_data()
-
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            self.toggle_blink_detection()
-        else:
-            self.after(10, self.process_frame)
+        self.after(10, self.update_frame)
 
     def update_blink_data(self):
         avg_blinks = self.blink_data['total_blinks'] / max(1, self.blink_data['total_minutes'])
