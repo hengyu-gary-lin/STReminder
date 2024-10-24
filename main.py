@@ -15,7 +15,7 @@ from PIL import Image, ImageTk
 import threading
 
 EAR_THRESHOLD = 0.40
-BLINK_CONSECUTIVE_FRAMES = 1
+BLINK_CONSECUTIVE_FRAMES = 3
 
 def calculate_ear(eye):
     A = dist.euclidean(eye[1], eye[5])
@@ -140,7 +140,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.video_frame.pack(side=TOP)
 
     def update_timer(self):
-        if self.running and self.eyes_detected:
+        if self.running:
             current_time = time.time()
             self.elapsed_time = current_time - self.start_time
             hours, remainder = divmod(self.elapsed_time, 3600)
@@ -207,7 +207,6 @@ class ScreenTimeReminder(ttk.Frame):
             self.blink_thread.start()
             self.after(10, self.update_frame)
 
-            # Create the labels when starting blink detection
             self.video_info_frame = ttk.Frame(self.video_frame.master)
             self.video_info_frame.pack(side=TOP, fill=X)
 
@@ -232,6 +231,9 @@ class ScreenTimeReminder(ttk.Frame):
                 self.video_info_frame.destroy()
 
     def blink_detection_loop(self):
+        elapsed_time = 0
+        last_time = time.time()
+
         while self.blink_detection_running:
             ret, frame = self.cap.read()
             if not ret:
@@ -267,13 +269,14 @@ class ScreenTimeReminder(ttk.Frame):
                         self.blink_count += 1
                     self.frames_counter = 0
 
-            elapsed_time = time.time() - self.blink_start_time
+            current_time = time.time()
+            if self.eyes_detected:
+                elapsed_time += current_time - last_time
 
-            # status_text = "Eyes detected" if self.eyes_detected else "No eyes detected"
+            last_time = current_time
+
             status_text, status_color = ("Eyes detected", "green") if self.eyes_detected else ("No eyes detected", "red")
 
-
-            # Update the labels
             self.after(0, lambda: self.blink_count_label.config(text=f"Blinks: {self.blink_count}"))
             self.after(0, lambda: self.blink_time_label.config(text=f"Time: {int(elapsed_time)}s"))
             self.after(0, lambda: self.eye_status_label.config(text=f"Eye Status: {status_text}", foreground=status_color))
@@ -290,7 +293,7 @@ class ScreenTimeReminder(ttk.Frame):
                     if self.blink_count < 15:
                         self.after(0, self.show_blink_reminder)
                 self.blink_count = 0
-                self.blink_start_time = time.time()
+                elapsed_time = 0
 
             time.sleep(0.01)  # Small delay to prevent excessive CPU usage
 
@@ -330,7 +333,6 @@ class ScreenTimeReminder(ttk.Frame):
             'total_minutes': 0,
             'current_blinks': 0
         }
-        self.blink_count = 0
         self.update_blink_data()
         messagebox.showinfo("Blink Data Reset", "Blink data has been reset successfully!")
 
