@@ -51,6 +51,8 @@ class ScreenTimeReminder(ttk.Frame):
 
         self.video_frame = None
 
+        self.eyes_detected = False
+
         self.create_ui_components()
         self.setup_blink_detection()
         self.update_timer()
@@ -118,7 +120,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.avg_blinks_label = ttk.Label(self.blink_data_frame, text="Average blinks per minute: 0")
         self.avg_blinks_label.pack(side=TOP, pady=5)
 
-        self.current_blinks_label = ttk.Label(self.blink_data_frame, text="Current blinks: 0")
+        self.current_blinks_label = ttk.Label(self.blink_data_frame, text="Last 60s blinks: 0")
         self.current_blinks_label.pack(side=TOP, pady=5)
 
         self.blink_reset_button = ttk.Button(
@@ -131,11 +133,14 @@ class ScreenTimeReminder(ttk.Frame):
         self.blink_reset_button.pack(side=TOP, padx=(0, 10), pady=5)
 
     def create_video_frame(self):
-        self.video_frame = ttk.Label(self)
-        self.video_frame.pack(side=RIGHT, pady=10, padx=10)
+        video_frame_container = ttk.Frame(self)
+        video_frame_container.pack(side=RIGHT, pady=10, padx=10)
+
+        self.video_frame = ttk.Label(video_frame_container)
+        self.video_frame.pack(side=TOP)
 
     def update_timer(self):
-        if self.running:
+        if self.running and self.eyes_detected:
             current_time = time.time()
             self.elapsed_time = current_time - self.start_time
             hours, remainder = divmod(self.elapsed_time, 3600)
@@ -201,12 +206,30 @@ class ScreenTimeReminder(ttk.Frame):
             self.blink_thread = threading.Thread(target=self.blink_detection_loop, daemon=True)
             self.blink_thread.start()
             self.after(10, self.update_frame)
+
+            # Create the labels when starting blink detection
+            self.video_info_frame = ttk.Frame(self.video_frame.master)
+            self.video_info_frame.pack(side=TOP, fill=X)
+
+            self.blink_count_label = ttk.Label(self.video_info_frame, text="Blinks: 0")
+            self.blink_count_label.pack(side=TOP, pady=2)
+
+            self.blink_time_label = ttk.Label(self.video_info_frame, text="Time: 0s")
+            self.blink_time_label.pack(side=TOP, pady=2)
+
+            self.eye_status_label = ttk.Label(self.video_info_frame, text="Eye Status: Not detected")
+            self.eye_status_label.pack(side=TOP, pady=2)
+
         else:
             self.blink_detection_running = False
             self.blink_detection_button.config(text="Start Blink Detection")
             if self.cap:
                 self.cap.release()
             self.video_frame.config(image='')
+
+            # Destroy the labels when stopping blink detection
+            if hasattr(self, 'video_info_frame'):
+                self.video_info_frame.destroy()
 
     def blink_detection_loop(self):
         while self.blink_detection_running:
@@ -217,7 +240,7 @@ class ScreenTimeReminder(ttk.Frame):
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = self.detector(gray, 0)
 
-            eyes_detected = False
+            self.eyes_detected = False
             for face in faces:
                 shape = self.predictor(gray, face)
                 shape = face_utils.shape_to_np(shape)
@@ -235,7 +258,7 @@ class ScreenTimeReminder(ttk.Frame):
                 cv2.drawContours(frame, [left_eye_hull], -1, (0, 255, 0), 1)
                 cv2.drawContours(frame, [right_eye_hull], -1, (0, 255, 0), 1)
 
-                eyes_detected = True
+                self.eyes_detected = True
 
                 if ear < EAR_THRESHOLD:
                     self.frames_counter += 1
@@ -246,22 +269,20 @@ class ScreenTimeReminder(ttk.Frame):
 
             elapsed_time = time.time() - self.blink_start_time
 
-            if eyes_detected:
-                status_text = "Eyes detected"
-                status_color = (0, 255, 0)
-            else:
-                status_text = "No eyes detected"
-                status_color = (0, 0, 255)
+            # status_text = "Eyes detected" if self.eyes_detected else "No eyes detected"
+            status_text, status_color = ("Eyes detected", "green") if self.eyes_detected else ("No eyes detected", "red")
 
-            cv2.putText(frame, f"Blinks: {self.blink_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame, f"Time: {int(elapsed_time)}s", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame, status_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+
+            # Update the labels
+            self.after(0, lambda: self.blink_count_label.config(text=f"Blinks: {self.blink_count}"))
+            self.after(0, lambda: self.blink_time_label.config(text=f"Time: {int(elapsed_time)}s"))
+            self.after(0, lambda: self.eye_status_label.config(text=f"Eye Status: {status_text}", foreground=status_color))
 
             if not self.frame_queue.full():
                 self.frame_queue.put(frame)
 
             if elapsed_time >= 60:
-                if eyes_detected:
+                if self.eyes_detected:
                     self.blink_data_queue.put({
                         'total_blinks': self.blink_count,
                         'current_blinks': self.blink_count
@@ -301,7 +322,7 @@ class ScreenTimeReminder(ttk.Frame):
     def update_blink_data(self):
         avg_blinks = self.blink_data['total_blinks'] / max(1, self.blink_data['total_minutes'])
         self.avg_blinks_label.config(text=f"Average blinks per minute: {avg_blinks:.2f}")
-        self.current_blinks_label.config(text=f"Current blinks: {self.blink_data['current_blinks']}")
+        self.current_blinks_label.config(text=f"Last 60s blinks: {self.blink_data['current_blinks']}")
 
     def reset_blink_data(self):
         self.blink_data = {
