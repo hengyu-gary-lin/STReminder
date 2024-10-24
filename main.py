@@ -269,12 +269,14 @@ class ScreenTimeReminder(ttk.Frame):
 
             elapsed_time = time.time() - self.blink_start_time
 
-            status_text = "Eyes detected" if self.eyes_detected else "No eyes detected"
+            # status_text = "Eyes detected" if self.eyes_detected else "No eyes detected"
+            status_text, status_color = ("Eyes detected", "green") if self.eyes_detected else ("No eyes detected", "red")
+
 
             # Update the labels
             self.after(0, lambda: self.blink_count_label.config(text=f"Blinks: {self.blink_count}"))
             self.after(0, lambda: self.blink_time_label.config(text=f"Time: {int(elapsed_time)}s"))
-            self.after(0, lambda: self.eye_status_label.config(text=f"Eye Status: {status_text}"))
+            self.after(0, lambda: self.eye_status_label.config(text=f"Eye Status: {status_text}", foreground=status_color))
 
             if not self.frame_queue.full():
                 self.frame_queue.put(frame)
