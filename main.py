@@ -32,7 +32,7 @@ class ScreenTimeReminder(ttk.Frame):
         self.running = False
         self.start_time = 0
         self.elapsed_time = 0
-        self.reminder_interval = 300  # 5 minutes default
+        self.reminder_interval = 300
         self.messagebox_open = False
 
         self.blink_detection_running = False
