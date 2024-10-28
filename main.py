@@ -14,8 +14,8 @@ import queue
 from PIL import Image, ImageTk
 import threading
 
-EAR_THRESHOLD = 0.40
-BLINK_CONSECUTIVE_FRAMES = 3
+EAR_THRESHOLD = 0.37
+BLINK_CONSECUTIVE_FRAMES = 1
 
 def calculate_ear(eye):
     A = dist.euclidean(eye[1], eye[5])
@@ -261,6 +261,8 @@ class ScreenTimeReminder(ttk.Frame):
                 cv2.drawContours(frame, [right_eye_hull], -1, (0, 255, 0), 1)
 
                 self.eyes_detected = True
+
+                # cv2.putText(frame, f"EAR: {ear:.2f}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
                 if ear < EAR_THRESHOLD:
                     self.frames_counter += 1
