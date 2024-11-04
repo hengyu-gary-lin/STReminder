@@ -15,7 +15,7 @@ from PIL import Image, ImageTk
 import threading
 
 EAR_THRESHOLD = 0.37
-BLINK_CONSECUTIVE_FRAMES = 1
+BLINK_CONSECUTIVE_FRAMES = 2
 
 def calculate_ear(eye):
     A = dist.euclidean(eye[1], eye[5])
